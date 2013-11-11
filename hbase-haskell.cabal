@@ -1,0 +1,24 @@
+name:           hbase-haskell
+version:        0.1
+cabal-version:  >=1.2
+build-type:     Simple
+author:         cerdep
+
+library
+  hs-source-dirs:  src
+  build-depends:   
+                   base >= 4,
+                   thrift >= 0.9.0,
+                   containers >= 0.5.0.0,
+                   vector,
+                   unordered-containers,
+                   text,
+                   hashable,
+                   bytestring
+  ghc-options:     -Wall
+  other-modules:   Database.Hbase.Hbase_Types, 
+                   Database.Hbase.Hbase, 
+                   Database.Hbase.Hbase_Iface,
+                   Database.Hbase.Hbase_Client,
+                   Database.Hbase.Hbase_Consts
+

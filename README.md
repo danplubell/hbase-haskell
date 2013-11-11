@@ -1,2 +1,2 @@
-hbase
-=====
+hbase-haskell
+=============

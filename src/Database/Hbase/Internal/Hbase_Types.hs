@@ -12,7 +12,7 @@
 -- DO NOT EDIT UNLESS YOU ARE SURE YOU KNOW WHAT YOU ARE DOING --
 -----------------------------------------------------------------
 
-module Database.Hbase.Hbase_Types where
+module Database.Hbase.Internal.Hbase_Types where
 import Prelude ( Bool(..), Enum, Double, String, Maybe(..),
                  Eq, Show, Ord,
                  return, length, IO, fromIntegral, fromEnum, toEnum,

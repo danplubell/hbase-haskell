@@ -16,9 +16,10 @@ library
                    hashable,
                    bytestring
   ghc-options:     -Wall
-  other-modules:   Database.Hbase.Hbase_Types, 
-                   Database.Hbase.Hbase, 
-                   Database.Hbase.Hbase_Iface,
-                   Database.Hbase.Hbase_Client,
-                   Database.Hbase.Hbase_Consts
+  other-modules:   
+                   Database.Hbase.Internal.Hbase,
+                   Database.Hbase.Internal.Hbase_Client,
+                   Database.Hbase.Internal.Hbase_Consts,
+                   Database.Hbase.Internal.Hbase_Iface,
+                   Database.Hbase.Internal.Hbase_Types
 

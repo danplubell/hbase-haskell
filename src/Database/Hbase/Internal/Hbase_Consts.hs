@@ -12,7 +12,7 @@
 -- DO NOT EDIT UNLESS YOU ARE SURE YOU KNOW WHAT YOU ARE DOING --
 -----------------------------------------------------------------
 
-module Database.Hbase.Hbase_Consts where
+module Database.Hbase.Internal.Hbase_Consts where
 import Prelude ( Bool(..), Enum, Double, String, Maybe(..),
                  Eq, Show, Ord,
                  return, length, IO, fromIntegral, fromEnum, toEnum,
@@ -33,4 +33,4 @@ import Thrift
 import Thrift.Types ()
 
 
-import Database.Hbase.Hbase_Types
+import Database.Hbase.Internal.Hbase_Types

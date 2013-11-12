@@ -12,7 +12,7 @@
 -- DO NOT EDIT UNLESS YOU ARE SURE YOU KNOW WHAT YOU ARE DOING --
 -----------------------------------------------------------------
 
-module Database.Hbase.Hbase where
+module Database.Hbase.Internal.Hbase where
 import Prelude ( Bool(..), Enum, Double, String, Maybe(..),
                  Eq, Show, Ord,
                  return, length, IO, fromIntegral, fromEnum, toEnum,
@@ -33,8 +33,8 @@ import Thrift
 import Thrift.Types ()
 
 
-import Database.Hbase.Hbase_Types
-import qualified Database.Hbase.Hbase_Iface as Iface
+import Database.Hbase.Internal.Hbase_Types
+import qualified Database.Hbase.Internal.Hbase_Iface as Iface
 -- HELPER FUNCTIONS AND STRUCTURES --
 
 data EnableTable_args = EnableTable_args{f_EnableTable_args_tableName :: Maybe ByteString} deriving (Show,Eq,Typeable)

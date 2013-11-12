@@ -14,7 +14,8 @@ library
                    unordered-containers,
                    text,
                    hashable,
-                   bytestring
+                   bytestring,
+                   network
   ghc-options:     -Wall
   other-modules:   
                    Database.Hbase.Internal.Hbase,
@@ -22,4 +23,5 @@ library
                    Database.Hbase.Internal.Hbase_Consts,
                    Database.Hbase.Internal.Hbase_Iface,
                    Database.Hbase.Internal.Hbase_Types
+  exposed-modules: Database.Hbase.Client
 

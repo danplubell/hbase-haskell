@@ -36,6 +36,7 @@ import Thrift.Types ()
 
 import Database.Hbase.Internal.Hbase_Types
 import Database.Hbase.Internal.Hbase
+
 seqid = newIORef 0
 enableTable (ip,op) arg_tableName = do
   send_enableTable op arg_tableName

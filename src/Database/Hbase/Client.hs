@@ -4,16 +4,23 @@ module Database.Hbase.Client
     HBaseConnectionSource(..),
     HBaseColumnDescriptor(..),
     HBaseConnection(..),
+    QualifiedColumnName(..),
+    Put(..),
     defaultHBaseConnectionSource,
     defaultColumnDescriptor,
     openConnection,
     closeConnection,
-    createTable    
+    createTable,
+    getTableNames,
+    disableTable,
+    deleteTable,
+    putRow 
 ) where
 
 import qualified    Data.ByteString.Lazy        as BL
 import qualified    Data.ByteString.Char8       as BC
 import qualified    Data.ByteString.Internal    as BSI
+import qualified    Data.ByteString             as BS
 import qualified    Data.Text.Lazy              as TL
 import              Network
 import              GHC.IO.Handle.Types
@@ -24,8 +31,13 @@ import              GHC.Int(Int32)
 import              Database.Hbase.Internal.Hbase_Types
 import qualified    Database.Hbase.Internal.Hbase_Client as HClient
 import qualified    Data.Vector                 as Vector
+import qualified    Data.HashMap.Strict as HashMap
 
 ------------Data Structures-------------------
+type TableName = String  
+type TableRegionName = String  
+type RowKey = BL.ByteString
+type Value = BL.ByteString
 
 data HBaseConnectionSource = HBaseConnectionSource
     {
@@ -73,9 +85,16 @@ defaultColumnDescriptor=HBaseColumnDescriptor
         , columnCacheEnabled        = Nothing
         , columnTimeToLive          = Nothing
     }       
-
-type TableName = String  
-type TableRegionName = String  
+data QualifiedColumnName = QualifiedColumnName 
+    {
+          qualifiedColumnFamily :: String
+        , qualifiedColumnName   :: String
+    }deriving (Show)
+data Put = Put
+    {
+          qualifiedColumn::QualifiedColumnName
+        , value::Value
+    }deriving (Show)
 ------------Functions-------------------------
 
 openConnection :: HBaseConnectionSource -> IO HBaseConnection
@@ -89,9 +108,25 @@ closeConnection c = tClose $ handle c
 createTable :: TableName->[HBaseColumnDescriptor]->HBaseConnection-> IO()
 createTable t l c =   
     HClient.createTable (connectionProtocol c,connectionProtocol c) 
-                        (strToLazyByteString t) 
+                        (strToLazy t) 
                         (Vector.fromList $ map fColDescFromHColDesc l)
-    
+
+
+getTableNames :: HBaseConnection -> IO [TableName]
+getTableNames conn = do
+        vector <- HClient.getTableNames (connectionProtocol conn, connectionProtocol conn)
+        return $ map (BC.unpack . lazyToStrict) $ Vector.toList vector
+
+--mutateRow (ip,op) arg_tableName arg_row arg_mutations arg_attributes
+putRow::TableName -> RowKey->[Put]->HBaseConnection -> IO()
+putRow t r p c = do
+        HClient.mutateRow (connectionProtocol c, connectionProtocol c) (strToLazy t) r (putsToMutations p) HashMap.empty
+
+disableTable::TableName -> HBaseConnection -> IO()
+disableTable t c= HClient.disableTable (connectionProtocol c, connectionProtocol c) (strToLazy t)
+
+deleteTable::TableName -> HBaseConnection -> IO()
+deleteTable t c = HClient.deleteTable (connectionProtocol c, connectionProtocol c) (strToLazy t)
 
 enableTable :: TableName -> HBaseConnection ->IO()
 enableTable = undefined
@@ -102,16 +137,17 @@ compact = undefined
 majorCompact :: TableRegionName -> HBaseConnection -> IO()
 majorCompact = undefined
 
-getTableNames :: HBaseConnection -> IO [TableName]
-getTableNames = undefined
 
 -----------Utility Functions-----------------
 --convert a string to list of Word8
 strToWord8s :: String -> [Word8]
 strToWord8s = BSI.unpackBytes . BC.pack 
 
-strToLazyByteString::String -> BL.ByteString
-strToLazyByteString = BL.pack.strToWord8s
+strToLazy::String -> BL.ByteString
+strToLazy = BL.pack.strToWord8s
+
+lazyToStrict :: BL.ByteString -> BS.ByteString
+lazyToStrict lazy = BS.concat $ BL.toChunks lazy
 
 maybeStrToText:: Maybe String -> Maybe TL.Text
 maybeStrToText str = case str of
@@ -121,7 +157,7 @@ maybeStrToText str = case str of
 maybeStrToLazyByteString:: Maybe String -> Maybe BL.ByteString 
 maybeStrToLazyByteString str = case str of
                                 Nothing -> Nothing
-                                Just s -> Just $ strToLazyByteString s 
+                                Just s -> Just $ strToLazy s 
 
 fColDescFromHColDesc::HBaseColumnDescriptor -> ColumnDescriptor
 fColDescFromHColDesc d  = ColumnDescriptor 
@@ -136,4 +172,16 @@ fColDescFromHColDesc d  = ColumnDescriptor
     , f_ColumnDescriptor_blockCacheEnabled      = columnCacheEnabled d
     , f_ColumnDescriptor_timeToLive             = columnTimeToLive d
   }
+convertQualifiedColumn::QualifiedColumnName-> BL.ByteString
+convertQualifiedColumn c = strToLazy $ qualifiedColumnFamily c ++ ":" ++ qualifiedColumnName c
 
+putsToMutations::[Put] -> Vector.Vector Mutation
+putsToMutations puts = Vector.fromList $ map (\p -> Mutation {
+                                                               f_Mutation_isDelete = Just False
+                                                             , f_Mutation_column = Just $ convertQualifiedColumn $ qualifiedColumn p
+                                                             , f_Mutation_value = Just $ value p
+                                                             , f_Mutation_writeToWAL = Just True
+                                                            }
+                                            )  puts
+
+                                       

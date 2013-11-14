@@ -17,6 +17,9 @@ module Database.Hbase.Client
     getTableNames,
     disableTable,
     deleteTable,
+    enableTable,
+    compact,
+    majorCompact,
     putRow,
     getRow 
 ) where
@@ -161,13 +164,15 @@ deleteTable::TableName -> HBaseConnection -> IO()
 deleteTable t c = HClient.deleteTable (connectionProtocol c, connectionProtocol c) (strToLazy t)
 
 enableTable :: TableName -> HBaseConnection ->IO()
-enableTable = undefined
+enableTable t c = HClient.enableTable (connectionProtocol c, connectionProtocol c) (strToLazy t) 
 
 compact :: TableRegionName -> HBaseConnection -> IO()
-compact = undefined
+compact tr c= HClient.compact (connectionProtocol c, connectionProtocol c) (strToLazy tr) 
 
 majorCompact :: TableRegionName -> HBaseConnection -> IO()
-majorCompact = undefined
+majorCompact tr c = HClient.majorCompact (connectionProtocol c, connectionProtocol c) (strToLazy tr)
+
+ 
 
 
 -----------Utility Functions-----------------

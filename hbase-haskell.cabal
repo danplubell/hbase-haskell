@@ -1,8 +1,20 @@
 name:           hbase-haskell
 version:        0.1
+synopsis:       An light wrapper over the HBase Thrift API
+license:        MIT
+license-file:   LICENSE
 cabal-version:  >=1.2
 build-type:     Simple
-author:         cerdep
+author:         Dan Plubell
+maintainer:     danplubell@gmail.com
+homepage:       https://github.com/danplubell/hbase-haskell
+category:       Database
+description:
+  The objective of this library is to provide a light wrapper over the HBase Thrift API.  The intent is to provide a more idiomatic 
+  way of using an HBase database.
+  .
+  
+
 
 library
   hs-source-dirs:  src

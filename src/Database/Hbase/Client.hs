@@ -29,6 +29,7 @@ import qualified    Data.Text.Lazy              as TL
 import              Network
 import              GHC.IO.Handle.Types
 import              Thrift.Transport.Handle
+import              Thrift.Transport.Framed
 import              Thrift.Protocol.Binary
 import              GHC.Word(Word8)
 import              GHC.Int

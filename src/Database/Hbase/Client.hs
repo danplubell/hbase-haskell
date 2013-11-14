@@ -6,6 +6,9 @@ module Database.Hbase.Client
     HBaseConnection(..),
     QualifiedColumnName(..),
     Put(..),
+    TableName,
+    RowKey,
+    Value,
     defaultHBaseConnectionSource,
     defaultColumnDescriptor,
     openConnection,
@@ -14,7 +17,8 @@ module Database.Hbase.Client
     getTableNames,
     disableTable,
     deleteTable,
-    putRow 
+    putRow,
+    getRow 
 ) where
 
 import qualified    Data.ByteString.Lazy        as BL
@@ -27,11 +31,12 @@ import              GHC.IO.Handle.Types
 import              Thrift.Transport.Handle
 import              Thrift.Protocol.Binary
 import              GHC.Word(Word8)
-import              GHC.Int(Int32)
+import              GHC.Int
 import              Database.Hbase.Internal.Hbase_Types
 import qualified    Database.Hbase.Internal.Hbase_Client as HClient
 import qualified    Data.Vector                 as Vector
 import qualified    Data.HashMap.Strict as HashMap
+import              Data.Int
 
 ------------Data Structures-------------------
 type TableName = String  
@@ -72,6 +77,7 @@ data HBaseConnection = HBaseConnection
         , connectionSource    :: HBaseConnectionSource  
         , connectionProtocol  :: BinaryProtocol Handle
     }
+
 defaultColumnDescriptor :: HBaseColumnDescriptor     
 defaultColumnDescriptor=HBaseColumnDescriptor 
     {
@@ -85,16 +91,38 @@ defaultColumnDescriptor=HBaseColumnDescriptor
         , columnCacheEnabled        = Nothing
         , columnTimeToLive          = Nothing
     }       
+
 data QualifiedColumnName = QualifiedColumnName 
     {
           qualifiedColumnFamily :: String
         , qualifiedColumnName   :: String
     }deriving (Show)
+
 data Put = Put
     {
           qualifiedColumn::QualifiedColumnName
         , value::Value
     }deriving (Show)
+    
+data RowResultValue = RowResultValue
+    {
+          rowResultValue :: Maybe BL.ByteString
+        , rowResultTimeStamp:: Maybe Int64
+    }deriving (Show) 
+    
+data RowResultColumn = RowResultColumn
+    {
+          rowResultColumn :: Maybe String
+        , rowResultColumnValue :: Maybe RowResultValue
+    }deriving (Show)
+
+data RowResult = RowResult 
+    {
+         rowResultKey :: Maybe RowKey
+       , rowResultColumns:: Maybe (HashMap.HashMap String RowResultValue)
+       , rowResultSortedColumns::Maybe (Vector.Vector RowResultColumn)
+    }deriving (Show)
+    
 ------------Functions-------------------------
 
 openConnection :: HBaseConnectionSource -> IO HBaseConnection
@@ -111,16 +139,19 @@ createTable t l c =
                         (strToLazy t) 
                         (Vector.fromList $ map fColDescFromHColDesc l)
 
-
 getTableNames :: HBaseConnection -> IO [TableName]
 getTableNames conn = do
         vector <- HClient.getTableNames (connectionProtocol conn, connectionProtocol conn)
         return $ map (BC.unpack . lazyToStrict) $ Vector.toList vector
 
---mutateRow (ip,op) arg_tableName arg_row arg_mutations arg_attributes
 putRow::TableName -> RowKey->[Put]->HBaseConnection -> IO()
 putRow t r p c = do
         HClient.mutateRow (connectionProtocol c, connectionProtocol c) (strToLazy t) r (putsToMutations p) HashMap.empty
+
+getRow::TableName->RowKey->HBaseConnection->IO (Vector.Vector RowResult)
+getRow t r conn = do
+    results <-HClient.getRow (connectionProtocol conn, connectionProtocol conn) (strToLazy t) r HashMap.empty
+    return $ Vector.map tRowResultToRowResult results
 
 disableTable::TableName -> HBaseConnection -> IO()
 disableTable t c= HClient.disableTable (connectionProtocol c, connectionProtocol c) (strToLazy t)
@@ -149,24 +180,15 @@ strToLazy = BL.pack.strToWord8s
 lazyToStrict :: BL.ByteString -> BS.ByteString
 lazyToStrict lazy = BS.concat $ BL.toChunks lazy
 
-maybeStrToText:: Maybe String -> Maybe TL.Text
-maybeStrToText str = case str of
-                Nothing -> Nothing
-                Just s -> Just $ TL.pack s
-                
-maybeStrToLazyByteString:: Maybe String -> Maybe BL.ByteString 
-maybeStrToLazyByteString str = case str of
-                                Nothing -> Nothing
-                                Just s -> Just $ strToLazy s 
 
 fColDescFromHColDesc::HBaseColumnDescriptor -> ColumnDescriptor
 fColDescFromHColDesc d  = ColumnDescriptor 
   {
-      f_ColumnDescriptor_name                   = maybeStrToLazyByteString  $ columnName d
+      f_ColumnDescriptor_name                   = fmap strToLazy $ columnName d
     , f_ColumnDescriptor_maxVersions            = columnMaxVersions d
-    , f_ColumnDescriptor_compression            = maybeStrToText $ columnCompression d
+    , f_ColumnDescriptor_compression            = fmap TL.pack $ columnCompression d
     , f_ColumnDescriptor_inMemory               = columnInMemory d
-    , f_ColumnDescriptor_bloomFilterType        = maybeStrToText $ columnBloomFilterType d
+    , f_ColumnDescriptor_bloomFilterType        = fmap TL.pack $ columnBloomFilterType d
     , f_ColumnDescriptor_bloomFilterVectorSize  = columnFilterVectorSize d
     , f_ColumnDescriptor_bloomFilterNbHashes    = columnFilterNbHashes d
     , f_ColumnDescriptor_blockCacheEnabled      = columnCacheEnabled d
@@ -184,4 +206,26 @@ putsToMutations puts = Vector.fromList $ map (\p -> Mutation {
                                                             }
                                             )  puts
 
-                                       
+tCellToResultValue::TCell->RowResultValue
+tCellToResultValue t = RowResultValue 
+    {
+        rowResultValue = f_TCell_value t
+      , rowResultTimeStamp = f_TCell_timestamp t
+    }
+tColumnToRowResultColumn::TColumn->RowResultColumn
+tColumnToRowResultColumn t =RowResultColumn 
+    {
+           rowResultColumn = fmap (BC.unpack . lazyToStrict) $ f_TColumn_columnName t
+         , rowResultColumnValue = fmap tCellToResultValue $ f_TColumn_cell t
+    }  
+    
+convertResultColumns:: (HashMap.HashMap BL.ByteString TCell) -> (HashMap.HashMap String RowResultValue)   
+convertResultColumns t = HashMap.fromList . map (\(bs,tcell) -> (BC.unpack $ lazyToStrict bs,tCellToResultValue tcell )) $ HashMap.toList t
+
+tRowResultToRowResult::TRowResult -> RowResult
+tRowResultToRowResult t = RowResult
+    {
+          rowResultKey = f_TRowResult_row t    
+        , rowResultColumns = fmap convertResultColumns $ f_TRowResult_columns t
+        , rowResultSortedColumns = fmap ( Vector.map tColumnToRowResultColumn) $ f_TRowResult_sortedColumns t
+    }                

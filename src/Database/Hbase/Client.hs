@@ -5,6 +5,7 @@ module Database.Hbase.Client
     , HBaseColumnDescriptor(..)
     , HBaseConnection(..)
     , Put(..)
+    , BatchPut(..)
     , TableName
     , RowKey
     , Value
@@ -23,6 +24,7 @@ module Database.Hbase.Client
     , getColumnDescriptors
     , putRow
     , putRowTs
+    , putRows
     , get
     , getRow 
     , getRows
@@ -40,7 +42,6 @@ import qualified    Data.Text.Lazy              as TL
 import              Network
 import              GHC.IO.Handle.Types
 import              Thrift.Transport.Handle
-import              Thrift.Transport.Framed
 import              Thrift.Protocol.Binary
 import              GHC.Word(Word8)
 import              GHC.Int
@@ -48,7 +49,6 @@ import              Database.Hbase.Internal.Hbase_Types
 import qualified    Database.Hbase.Internal.Hbase_Client as HClient
 import qualified    Data.Vector                 as Vector
 import qualified    Data.HashMap.Strict as HashMap
-import              Data.Int
 
 ------------Data Structures-------------------
 type TableName          = String  
@@ -114,7 +114,6 @@ data Put = Put
           putColumnName ::ColumnName
         , putValue      ::Value
     }deriving (Show)
---data BatchMutation = BatchMutation{f_BatchMutation_row :: Maybe ByteString,f_BatchMutation_mutations :: Maybe (Vector.Vector Mutation)} deriving (Show,Eq,Typeable)
 data BatchPut = BatchPut
     {
           batchPutRowKey    ::BL.ByteString
@@ -202,7 +201,6 @@ getRowWithColumnsTs t r c ts conn = do
     results <- HClient.getRowWithColumnsTs (connectionIpOp conn) (strToLazy t) r  (Vector.fromList $ map  strToLazy c) ts HashMap.empty
     return $ Vector.map tRowResultToRowResult results
 
---getRowsWithColumnsTs (ip,op) arg_tableName arg_rows arg_columns arg_timestamp arg_attributes
 getRowsWithColumnsTs :: TableName -> [RowKey]-> [ColumnName] -> TimeStamp -> HBaseConnection->IO (Vector.Vector RowResult)
 getRowsWithColumnsTs t r c ts conn = do
     results <- HClient.getRowsWithColumnsTs (connectionIpOp conn) (strToLazy t) (Vector.fromList r) (Vector.fromList $ map  strToLazy c) ts HashMap.empty
@@ -248,15 +246,18 @@ getTableRegions t c = do
                             
                         }) regions
 putRow::TableName -> RowKey->[Put]->HBaseConnection -> IO()
-putRow t r p c = do
-        HClient.mutateRow (connectionIpOp c) (strToLazy t) r (putsToMutations p) HashMap.empty
+putRow t r p c = 
+    HClient.mutateRow (connectionIpOp c) (strToLazy t) r (putsToMutations p) HashMap.empty
 
 putRowTs :: TableName -> RowKey -> [Put] -> TimeStamp -> HBaseConnection -> IO()
-putRowTs t r p ts c= do
+putRowTs t r p ts c= 
     HClient.mutateRowTs (connectionIpOp c) (strToLazy t) r (putsToMutations p ) ts HashMap.empty
 
 --mutateRows (ip,op) arg_tableName arg_rowBatches arg_attributes
---putRows    
+putRows :: TableName -> [BatchPut] -> HBaseConnection -> IO()
+putRows t b c= 
+    HClient.mutateRows (connectionIpOp c) (strToLazy t) (batchPutsToBatchMutations b) HashMap.empty
+    
 -----------Utility Functions-----------------
 --convert a string to list of Word8
 strToWord8s :: String -> [Word8]
@@ -309,6 +310,16 @@ putsToMutations puts = Vector.fromList $ map (\p -> Mutation
                                                      , f_Mutation_writeToWAL = Just True
                                                     }
                                             )  puts
+--data BatchMutation = BatchMutation{f_BatchMutation_row :: Maybe ByteString,f_BatchMutation_mutations :: Maybe (Vector.Vector Mutation)} deriving (Show,Eq,Typeable)
+                                            
+batchPutsToBatchMutations :: [BatchPut] -> Vector.Vector BatchMutation
+batchPutsToBatchMutations bps = Vector.fromList $ map (\bp -> BatchMutation
+                                                          {
+                                                              f_BatchMutation_row = Just $ batchPutRowKey bp
+                                                            , f_BatchMutation_mutations = Just $ putsToMutations $ batchPuts bp
+                                                            
+                                                          }
+                                                       )  bps
 
 tCellToResultValue::TCell->RowResultValue
 tCellToResultValue t = RowResultValue 

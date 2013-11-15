@@ -18,11 +18,15 @@ module Database.Hbase.Client
     , disableTable
     , deleteTable
     , enableTable
+    , getTableRegions
     , compact
     , majorCompact
     , getColumnDescriptors
     , putRow
+    , get
     , getRow 
+    , getRowWithColumns
+    , getRowTs
 ) where
 
 import qualified    Data.ByteString.Lazy        as BL
@@ -49,6 +53,7 @@ type TableRegionName    = String
 type RowKey             = BL.ByteString
 type Value              = BL.ByteString
 type ColumnName         = String
+type TimeStamp          = Int64
 
 data HBaseConnectionSource = HBaseConnectionSource
     {
@@ -129,7 +134,18 @@ data RowResult = RowResult
        , rowResultColumns       :: Maybe (HashMap.HashMap ColumnName RowResultValue)
        , rowResultSortedColumns :: Maybe (Vector.Vector RowResultColumn)
     }deriving (Show)
-    
+
+data RegionInfo = RegionInfo
+    {
+          startKey              :: Maybe BL.ByteString
+        , endKey                :: Maybe BL.ByteString
+        , regionId              :: Maybe Int64
+        , regionName            :: Maybe String
+        , regionInfoVersion     :: Maybe Int8
+        , regionInfoServerName  :: Maybe String
+        , regionInfoPort        :: Maybe Int32
+    }deriving (Show)
+   
 ------------Functions-------------------------
 
 openConnection :: HBaseConnectionSource -> IO HBaseConnection
@@ -159,9 +175,25 @@ putRow::TableName -> RowKey->[Put]->HBaseConnection -> IO()
 putRow t r p c = do
         HClient.mutateRow (connectionIpOp c) (strToLazy t) r (putsToMutations p) HashMap.empty
 
+get :: TableName -> RowKey -> ColumnName -> HBaseConnection-> IO (Vector.Vector RowResultValue)
+get t r c conn= do
+    result <- HClient.get (connectionIpOp conn) (strToLazy t) r (strToLazy c) HashMap.empty
+    return $ Vector.map tCellToResultValue result
+    
 getRow::TableName->RowKey->HBaseConnection->IO (Vector.Vector RowResult)
 getRow t r conn = do
-    results <-HClient.getRow (connectionProtocol conn, connectionProtocol conn) (strToLazy t) r HashMap.empty
+    results <-HClient.getRow (connectionIpOp conn) (strToLazy t) r HashMap.empty
+    return $ Vector.map tRowResultToRowResult results
+
+getRowWithColumns::TableName->RowKey->[ColumnName]->HBaseConnection -> IO (Vector.Vector RowResult)
+getRowWithColumns t r cols conn = do
+        let columns = Vector.fromList $ map strToLazy cols
+        results <-HClient.getRowWithColumns (connectionIpOp conn) (strToLazy t) r columns HashMap.empty
+        return $ Vector.map tRowResultToRowResult results
+
+getRowTs::TableName -> RowKey ->  TimeStamp -> HBaseConnection -> IO (Vector.Vector RowResult)
+getRowTs t r ts conn= do
+    results <- HClient.getRowTs (connectionIpOp conn) (strToLazy t) r ts HashMap.empty 
     return $ Vector.map tRowResultToRowResult results
 
 disableTable::TableName -> HBaseConnection -> IO()
@@ -182,8 +214,24 @@ majorCompact tr c = HClient.majorCompact (connectionIpOp c) (strToLazy tr)
 getColumnDescriptors ::TableName-> HBaseConnection -> IO (HashMap.HashMap ColumnName HBaseColumnDescriptor)
 getColumnDescriptors t c = do
     results <- HClient.getColumnDescriptors (connectionIpOp c) (strToLazy t)
-    return $    HashMap.fromList $ map  (\(n,c) -> (lazyToString n, hColDescFromfColDesc c)) (HashMap.toList results)
-    
+    return $    HashMap.fromList $ map  (\(n,cols) -> (lazyToString n, hColDescFromfColDesc cols)) (HashMap.toList results)
+
+--data TRegionInfo = TRegionInfo{f_TRegionInfo_startKey :: Maybe ByteString,f_TRegionInfo_endKey :: Maybe ByteString,f_TRegionInfo_id :: Maybe Int64,f_TRegionInfo_name :: Maybe ByteString,f_TRegionInfo_version :: Maybe Int8,f_TRegionInfo_serverName :: Maybe ByteString,f_TRegionInfo_port :: Maybe Int32} deriving (Show,Eq,Typeable)
+
+getTableRegions :: TableName -> HBaseConnection -> IO (Vector.Vector RegionInfo)
+getTableRegions t c = do
+    regions <- HClient.getTableRegions ( connectionIpOp c) (strToLazy t)
+    return $ fmap (\r -> RegionInfo
+                        {
+                              startKey = f_TRegionInfo_startKey r
+                            , endKey = f_TRegionInfo_endKey r
+                            , regionId = f_TRegionInfo_id r
+                            , regionName = fmap (lazyToString) $ f_TRegionInfo_name r
+                            , regionInfoVersion = f_TRegionInfo_version r
+                            , regionInfoServerName = fmap (lazyToString) $ f_TRegionInfo_serverName r
+                            , regionInfoPort = f_TRegionInfo_port r
+                            
+                        }) regions
 -----------Utility Functions-----------------
 --convert a string to list of Word8
 strToWord8s :: String -> [Word8]
@@ -230,12 +278,13 @@ convertQualifiedColumn::QualifiedColumnName-> BL.ByteString
 convertQualifiedColumn c = strToLazy $ qualifiedColumnFamily c ++ ":" ++ qualifiedColumnName c
 
 putsToMutations::[Put] -> Vector.Vector Mutation
-putsToMutations puts = Vector.fromList $ map (\p -> Mutation {
-                                                               f_Mutation_isDelete = Just False
-                                                             , f_Mutation_column = Just $ convertQualifiedColumn $ qualifiedColumn p
-                                                             , f_Mutation_value = Just $ value p
-                                                             , f_Mutation_writeToWAL = Just True
-                                                            }
+putsToMutations puts = Vector.fromList $ map (\p -> Mutation 
+                                                    {
+                                                       f_Mutation_isDelete = Just False
+                                                     , f_Mutation_column = Just $ convertQualifiedColumn $ qualifiedColumn p
+                                                     , f_Mutation_value = Just $ value p
+                                                     , f_Mutation_writeToWAL = Just True
+                                                    }
                                             )  puts
 
 tCellToResultValue::TCell->RowResultValue

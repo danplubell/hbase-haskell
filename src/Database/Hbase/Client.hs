@@ -25,6 +25,7 @@ module Database.Hbase.Client
     , putRow
     , putRowTs
     , putRows
+    , putRowsTs
     , get
     , getRow 
     , getRows
@@ -32,6 +33,7 @@ module Database.Hbase.Client
     , getRowWithColumnsTs
     , getRowsWithColumnsTs
     , getRowTs
+    , atomicIncrement
 ) where
 
 import qualified    Data.ByteString.Lazy        as BL
@@ -257,7 +259,20 @@ putRowTs t r p ts c=
 putRows :: TableName -> [BatchPut] -> HBaseConnection -> IO()
 putRows t b c= 
     HClient.mutateRows (connectionIpOp c) (strToLazy t) (batchPutsToBatchMutations b) HashMap.empty
+
+--mutateRowsTs (ip,op) arg_tableName arg_rowBatches arg_timestamp arg_attributes = do
+putRowsTs :: TableName -> [BatchPut] -> TimeStamp -> HBaseConnection -> IO()
+putRowsTs t b ts c = 
+    HClient.mutateRowsTs (connectionIpOp c) (strToLazy t) (batchPutsToBatchMutations b) ts HashMap.empty 
     
+--atomicIncrement (ip,op) arg_tableName arg_row arg_column arg_value 
+atomicIncrement::TableName -> RowKey -> ColumnName -> Int64 -> HBaseConnection -> IO Int64
+atomicIncrement t r c i conn= do
+    result <- HClient.atomicIncrement (connectionIpOp conn) (strToLazy t) r (strToLazy c) i 
+    return result
+-- increment (ip,op) arg_increment
+-- incrementRows (ip,op) arg_increments
+
 -----------Utility Functions-----------------
 --convert a string to list of Word8
 strToWord8s :: String -> [Word8]

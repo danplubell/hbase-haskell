@@ -34,6 +34,8 @@ module Database.Hbase.Client
     , getRowsWithColumnsTs
     , getRowTs
     , atomicIncrement
+    , increment
+    , incrementRows
 ) where
 
 import qualified    Data.ByteString.Lazy        as BL
@@ -150,7 +152,14 @@ data RegionInfo = RegionInfo
         , regionInfoServerName  :: Maybe String
         , regionInfoPort        :: Maybe Int32
     }deriving (Show)
-   
+
+data Increment = Increment
+    {
+          incrementTable    :: String
+        , incrementRow      :: BL.ByteString
+        , incrementColumn   :: String
+        , incrementAmount   :: Int64
+    }   
 ------------Functions-------------------------
 
 openConnection :: HBaseConnectionSource -> IO HBaseConnection
@@ -255,24 +264,27 @@ putRowTs :: TableName -> RowKey -> [Put] -> TimeStamp -> HBaseConnection -> IO()
 putRowTs t r p ts c= 
     HClient.mutateRowTs (connectionIpOp c) (strToLazy t) r (putsToMutations p ) ts HashMap.empty
 
---mutateRows (ip,op) arg_tableName arg_rowBatches arg_attributes
 putRows :: TableName -> [BatchPut] -> HBaseConnection -> IO()
 putRows t b c= 
     HClient.mutateRows (connectionIpOp c) (strToLazy t) (batchPutsToBatchMutations b) HashMap.empty
 
---mutateRowsTs (ip,op) arg_tableName arg_rowBatches arg_timestamp arg_attributes = do
 putRowsTs :: TableName -> [BatchPut] -> TimeStamp -> HBaseConnection -> IO()
 putRowsTs t b ts c = 
     HClient.mutateRowsTs (connectionIpOp c) (strToLazy t) (batchPutsToBatchMutations b) ts HashMap.empty 
     
---atomicIncrement (ip,op) arg_tableName arg_row arg_column arg_value 
 atomicIncrement::TableName -> RowKey -> ColumnName -> Int64 -> HBaseConnection -> IO Int64
 atomicIncrement t r c i conn= do
     result <- HClient.atomicIncrement (connectionIpOp conn) (strToLazy t) r (strToLazy c) i 
     return result
 -- increment (ip,op) arg_increment
+increment :: Increment -> HBaseConnection -> IO ()
+increment i conn= 
+    HClient.increment (connectionIpOp conn) (incrementToTIncrement i) 
+    
 -- incrementRows (ip,op) arg_increments
-
+incrementRows :: [Increment] -> HBaseConnection -> IO ()
+incrementRows i conn = 
+    HClient.incrementRows (connectionIpOp conn) (Vector.fromList $ map incrementToTIncrement i)
 -----------Utility Functions-----------------
 --convert a string to list of Word8
 strToWord8s :: String -> [Word8]
@@ -358,4 +370,13 @@ tRowResultToRowResult t = RowResult
           rowResultKey = f_TRowResult_row t    
         , rowResultColumns = fmap convertResultColumns $ f_TRowResult_columns t
         , rowResultSortedColumns = fmap ( Vector.map tColumnToRowResultColumn) $ f_TRowResult_sortedColumns t
+    }   
+    
+incrementToTIncrement::Increment -> TIncrement
+incrementToTIncrement i = TIncrement
+    {
+          f_TIncrement_table = Just $ strToLazy $ incrementTable i
+        , f_TIncrement_row = Just $ incrementRow i
+        , f_TIncrement_column = Just $ strToLazy $ incrementColumn i
+        , f_TIncrement_ammount = Just $ incrementAmount i
     }                

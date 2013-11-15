@@ -26,6 +26,7 @@ module Database.Hbase.Client
     , get
     , getRow 
     , getRowWithColumns
+    , getRowWithColumnsTs
     , getRowTs
 ) where
 
@@ -196,6 +197,12 @@ getRowTs t r ts conn= do
     results <- HClient.getRowTs (connectionIpOp conn) (strToLazy t) r ts HashMap.empty 
     return $ Vector.map tRowResultToRowResult results
 
+--getRowWithColumnsTs (ip,op) arg_tableName arg_row arg_columns arg_timestamp arg_attributes
+getRowWithColumnsTs :: TableName -> RowKey -> [ColumnName] -> TimeStamp -> HBaseConnection -> IO (Vector.Vector RowResult)
+getRowWithColumnsTs t r c ts conn = do
+    results <- HClient.getRowWithColumnsTs (connectionIpOp conn) (strToLazy t) r  (Vector.fromList $ map  strToLazy c) ts HashMap.empty
+    return $ Vector.map tRowResultToRowResult results
+
 disableTable::TableName -> HBaseConnection -> IO()
 disableTable t c= HClient.disableTable (connectionIpOp c) (strToLazy t)
 
@@ -216,7 +223,6 @@ getColumnDescriptors t c = do
     results <- HClient.getColumnDescriptors (connectionIpOp c) (strToLazy t)
     return $    HashMap.fromList $ map  (\(n,cols) -> (lazyToString n, hColDescFromfColDesc cols)) (HashMap.toList results)
 
---data TRegionInfo = TRegionInfo{f_TRegionInfo_startKey :: Maybe ByteString,f_TRegionInfo_endKey :: Maybe ByteString,f_TRegionInfo_id :: Maybe Int64,f_TRegionInfo_name :: Maybe ByteString,f_TRegionInfo_version :: Maybe Int8,f_TRegionInfo_serverName :: Maybe ByteString,f_TRegionInfo_port :: Maybe Int32} deriving (Show,Eq,Typeable)
 
 getTableRegions :: TableName -> HBaseConnection -> IO (Vector.Vector RegionInfo)
 getTableRegions t c = do

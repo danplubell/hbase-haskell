@@ -36,6 +36,11 @@ module Database.Hbase.Client
     , atomicIncrement
     , increment
     , incrementRows
+    , deleteAll
+    , deleteAllTs
+    , deleteAllRow
+    , deleteAllRowTs
+    , scannerOpenWithScan
 ) where
 
 import qualified    Data.ByteString.Lazy        as BL
@@ -61,6 +66,8 @@ type RowKey             = BL.ByteString
 type Value              = BL.ByteString
 type ColumnName         = String
 type TimeStamp          = Int64
+type FilterString       = String
+type ScanId             = Int32
 
 data HBaseConnectionSource = HBaseConnectionSource
     {
@@ -160,6 +167,19 @@ data Increment = Increment
         , incrementColumn   :: String
         , incrementAmount   :: Int64
     }   
+    
+--data TScan = TScan{f_TScan_startRow :: Maybe ByteString,f_TScan_stopRow :: Maybe ByteString,f_TScan_timestamp :: Maybe Int64,f_TScan_columns :: Maybe (Vector.Vector ByteString),f_TScan_caching :: Maybe Int32,f_TScan_filterString :: Maybe ByteString,f_TScan_batchSize :: Maybe Int32,f_TScan_sortColumns :: Maybe Bool} deriving (Show,Eq,Typeable)
+data Scan = Scan 
+    {
+          scanStartRow      :: BL.ByteString
+        , scanStopRow       :: Maybe BL.ByteString
+        , scanTimeStamp     :: Maybe Int64
+        , scanColumns       :: [ColumnName]
+        , scanCaching       :: Int32
+        , scanFilterString  :: Maybe FilterString
+        , scanBatchSize     :: Maybe Int32
+        , scanSortColumns   :: Bool   
+    }    
 ------------Functions-------------------------
 
 openConnection :: HBaseConnectionSource -> IO HBaseConnection
@@ -297,6 +317,13 @@ deleteAllRow t r conn= HClient.deleteAllRow (connectionIpOp conn) (strToLazy t) 
 
 deleteAllRowTs::TableName -> RowKey -> TimeStamp->HBaseConnection -> IO()
 deleteAllRowTs t r ts conn = HClient.deleteAllRowTs (connectionIpOp conn) (strToLazy t) r ts HashMap.empty
+
+scannerOpenWithScan :: TableName -> Scan -> HBaseConnection -> IO ScanId
+scannerOpenWithScan t s conn = do
+    HClient.scannerOpenWithScan (connectionIpOp conn) (strToLazy t) (scanToTScan s) HashMap.empty
+    
+    
+
 -----------Utility Functions-----------------
 --convert a string to list of Word8
 strToWord8s :: String -> [Word8]
@@ -391,4 +418,18 @@ incrementToTIncrement i = TIncrement
         , f_TIncrement_row = Just $ incrementRow i
         , f_TIncrement_column = Just $ strToLazy $ incrementColumn i
         , f_TIncrement_ammount = Just $ incrementAmount i
-    }                
+    }    
+scanToTScan::Scan -> TScan
+scanToTScan s = TScan 
+    {
+          f_TScan_startRow = Just $ scanStartRow s
+        , f_TScan_stopRow = scanStopRow s
+        , f_TScan_timestamp = scanTimeStamp s
+        , f_TScan_columns = Just $ Vector.fromList $ map strToLazy $ scanColumns s
+        , f_TScan_caching = Just $ scanCaching s
+        , f_TScan_filterString = fmap strToLazy $ scanFilterString s
+        , f_TScan_batchSize = scanBatchSize s
+        , f_TScan_sortColumns = Just $ scanSortColumns s
+        
+          
+    }            

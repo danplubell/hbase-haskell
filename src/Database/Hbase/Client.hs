@@ -4,7 +4,6 @@ module Database.Hbase.Client
       HBaseConnectionSource(..)
     , HBaseColumnDescriptor(..)
     , HBaseConnection(..)
-    , QualifiedColumnName(..)
     , Put(..)
     , TableName
     , RowKey
@@ -23,10 +22,13 @@ module Database.Hbase.Client
     , majorCompact
     , getColumnDescriptors
     , putRow
+    , putRowTs
     , get
     , getRow 
+    , getRows
     , getRowWithColumns
     , getRowWithColumnsTs
+    , getRowsWithColumnsTs
     , getRowTs
 ) where
 
@@ -105,18 +107,19 @@ defaultColumnDescriptor=HBaseColumnDescriptor
         , columnTimeToLive              = Nothing
     }       
 
-data QualifiedColumnName = QualifiedColumnName 
-    {
-          qualifiedColumnFamily :: String
-        , qualifiedColumnName   :: String
-    }deriving (Show)
+
 
 data Put = Put
     {
-          qualifiedColumn      ::QualifiedColumnName
-        , value                ::Value
+          putColumnName ::ColumnName
+        , putValue      ::Value
     }deriving (Show)
-    
+--data BatchMutation = BatchMutation{f_BatchMutation_row :: Maybe ByteString,f_BatchMutation_mutations :: Maybe (Vector.Vector Mutation)} deriving (Show,Eq,Typeable)
+data BatchPut = BatchPut
+    {
+          batchPutRowKey    ::BL.ByteString
+        , batchPuts         ::[Put]
+    }    
 data RowResultValue = RowResultValue
     {
           rowResultValue        :: Maybe BL.ByteString
@@ -172,9 +175,6 @@ getTableNames conn = do
         vector <- HClient.getTableNames (connectionIpOp conn)
         return $ map (BC.unpack . lazyToStrict) $ Vector.toList vector
 
-putRow::TableName -> RowKey->[Put]->HBaseConnection -> IO()
-putRow t r p c = do
-        HClient.mutateRow (connectionIpOp c) (strToLazy t) r (putsToMutations p) HashMap.empty
 
 get :: TableName -> RowKey -> ColumnName -> HBaseConnection-> IO (Vector.Vector RowResultValue)
 get t r c conn= do
@@ -197,12 +197,21 @@ getRowTs t r ts conn= do
     results <- HClient.getRowTs (connectionIpOp conn) (strToLazy t) r ts HashMap.empty 
     return $ Vector.map tRowResultToRowResult results
 
---getRowWithColumnsTs (ip,op) arg_tableName arg_row arg_columns arg_timestamp arg_attributes
 getRowWithColumnsTs :: TableName -> RowKey -> [ColumnName] -> TimeStamp -> HBaseConnection -> IO (Vector.Vector RowResult)
 getRowWithColumnsTs t r c ts conn = do
     results <- HClient.getRowWithColumnsTs (connectionIpOp conn) (strToLazy t) r  (Vector.fromList $ map  strToLazy c) ts HashMap.empty
     return $ Vector.map tRowResultToRowResult results
 
+--getRowsWithColumnsTs (ip,op) arg_tableName arg_rows arg_columns arg_timestamp arg_attributes
+getRowsWithColumnsTs :: TableName -> [RowKey]-> [ColumnName] -> TimeStamp -> HBaseConnection->IO (Vector.Vector RowResult)
+getRowsWithColumnsTs t r c ts conn = do
+    results <- HClient.getRowsWithColumnsTs (connectionIpOp conn) (strToLazy t) (Vector.fromList r) (Vector.fromList $ map  strToLazy c) ts HashMap.empty
+    return $ (Vector.map tRowResultToRowResult results) 
+
+getRows :: TableName -> [RowKey]->HBaseConnection -> IO (Vector.Vector RowResult)
+getRows t r conn = do
+    results <- HClient.getRows (connectionIpOp conn) (strToLazy t) (Vector.fromList r) HashMap.empty
+    return $ Vector.map tRowResultToRowResult results
 disableTable::TableName -> HBaseConnection -> IO()
 disableTable t c= HClient.disableTable (connectionIpOp c) (strToLazy t)
 
@@ -238,6 +247,16 @@ getTableRegions t c = do
                             , regionInfoPort = f_TRegionInfo_port r
                             
                         }) regions
+putRow::TableName -> RowKey->[Put]->HBaseConnection -> IO()
+putRow t r p c = do
+        HClient.mutateRow (connectionIpOp c) (strToLazy t) r (putsToMutations p) HashMap.empty
+
+putRowTs :: TableName -> RowKey -> [Put] -> TimeStamp -> HBaseConnection -> IO()
+putRowTs t r p ts c= do
+    HClient.mutateRowTs (connectionIpOp c) (strToLazy t) r (putsToMutations p ) ts HashMap.empty
+
+--mutateRows (ip,op) arg_tableName arg_rowBatches arg_attributes
+--putRows    
 -----------Utility Functions-----------------
 --convert a string to list of Word8
 strToWord8s :: String -> [Word8]
@@ -280,15 +299,13 @@ hColDescFromfColDesc d = HBaseColumnDescriptor
         , columnTimeToLive              = f_ColumnDescriptor_timeToLive d
         
     }  
-convertQualifiedColumn::QualifiedColumnName-> BL.ByteString
-convertQualifiedColumn c = strToLazy $ qualifiedColumnFamily c ++ ":" ++ qualifiedColumnName c
 
 putsToMutations::[Put] -> Vector.Vector Mutation
 putsToMutations puts = Vector.fromList $ map (\p -> Mutation 
                                                     {
                                                        f_Mutation_isDelete = Just False
-                                                     , f_Mutation_column = Just $ convertQualifiedColumn $ qualifiedColumn p
-                                                     , f_Mutation_value = Just $ value p
+                                                     , f_Mutation_column = Just $ strToLazy $ putColumnName p
+                                                     , f_Mutation_value = Just $ putValue p
                                                      , f_Mutation_writeToWAL = Just True
                                                     }
                                             )  puts

@@ -285,6 +285,18 @@ increment i conn=
 incrementRows :: [Increment] -> HBaseConnection -> IO ()
 incrementRows i conn = 
     HClient.incrementRows (connectionIpOp conn) (Vector.fromList $ map incrementToTIncrement i)
+    
+deleteAll :: TableName-> RowKey -> ColumnName -> HBaseConnection -> IO()
+deleteAll t r c conn = HClient.deleteAll (connectionIpOp conn) (strToLazy t) r (strToLazy c) HashMap.empty
+
+deleteAllTs:: TableName -> RowKey -> ColumnName -> TimeStamp -> HBaseConnection -> IO()
+deleteAllTs t r c ts conn = HClient.deleteAllTs (connectionIpOp conn) (strToLazy t) r (strToLazy c) ts HashMap.empty
+
+deleteAllRow::TableName -> RowKey -> HBaseConnection->IO()
+deleteAllRow t r conn= HClient.deleteAllRow (connectionIpOp conn) (strToLazy t) r HashMap.empty
+
+deleteAllRowTs::TableName -> RowKey -> TimeStamp->HBaseConnection -> IO()
+deleteAllRowTs t r ts conn = HClient.deleteAllRowTs (connectionIpOp conn) (strToLazy t) r ts HashMap.empty
 -----------Utility Functions-----------------
 --convert a string to list of Word8
 strToWord8s :: String -> [Word8]

@@ -9,6 +9,8 @@ module Database.HBase.Client1
     , HBaseConnection(..)
     , Put(..)
     , BatchPut(..)
+    , Scan(..)
+    , Increment(..)
     , TableName  
     , TableRegionName
     , RowKey             
@@ -60,6 +62,7 @@ module Database.HBase.Client1
     , scannerOpenTs
     , scannerOpenWithStopTs
     , scannerGetList
+    , scannerGet
     
     
 ) where

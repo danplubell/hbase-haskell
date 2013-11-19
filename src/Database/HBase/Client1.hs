@@ -9,9 +9,16 @@ module Database.HBase.Client1
     , HBaseConnection(..)
     , Put(..)
     , BatchPut(..)
-    , TableName
-    , RowKey
-    , Value
+    , TableName  
+    , TableRegionName
+    , RowKey             
+    , Value             
+    , ColumnName         
+    , ColumnFamily       
+    , TimeStamp          
+    , FilterString       
+    , ScanId             
+    , StartAndPrefix   
     , defaultHBaseConnectionSource
     , defaultColumnDescriptor
     , openConnection
@@ -36,6 +43,8 @@ module Database.HBase.Client1
     , getRowWithColumnsTs
     , getRowsWithColumnsTs
     , getRowTs
+    , getRowOrBefore
+    , getRegionInfo
     , atomicIncrement
     , increment
     , incrementRows
@@ -47,6 +56,12 @@ module Database.HBase.Client1
     , scannerClose
     , scannerOpenWithStop
     , scannerOpen
+    , scannerOpenWithPrefix
+    , scannerOpenTs
+    , scannerOpenWithStopTs
+    , scannerGetList
+    
+    
 ) where
 
 import qualified    Data.ByteString.Lazy        as BL
@@ -71,9 +86,11 @@ type TableRegionName    = String
 type RowKey             = BL.ByteString
 type Value              = BL.ByteString
 type ColumnName         = String
+type ColumnFamily       = String
 type TimeStamp          = Int64
 type FilterString       = String
 type ScanId             = Int32
+type StartAndPrefix     = BL.ByteString
 
 data HBaseConnectionSource = HBaseConnectionSource
     {
@@ -174,7 +191,6 @@ data Increment = Increment
         , incrementAmount   :: Int64
     }   
     
---data TScan = TScan{f_TScan_startRow :: Maybe ByteString,f_TScan_stopRow :: Maybe ByteString,f_TScan_timestamp :: Maybe Int64,f_TScan_columns :: Maybe (Vector.Vector ByteString),f_TScan_caching :: Maybe Int32,f_TScan_filterString :: Maybe ByteString,f_TScan_batchSize :: Maybe Int32,f_TScan_sortColumns :: Maybe Bool} deriving (Show,Eq,Typeable)
 data Scan = Scan 
     {
           scanStartRow      :: BL.ByteString
@@ -250,6 +266,11 @@ getRows t r conn = do
 disableTable::TableName -> HBaseConnection -> IO()
 disableTable t c= HClient.disableTable (connectionIpOp c) (strToLazy t)
 
+getRowOrBefore::TableName -> RowKey->ColumnFamily->HBaseConnection -> IO (Vector.Vector RowResultValue)
+getRowOrBefore t r f conn = do
+    result <- HClient.getRowOrBefore (connectionIpOp conn) (strToLazy t) r (strToLazy f) 
+    return $ Vector.map tCellToResultValue result
+    
 deleteTable::TableName -> HBaseConnection -> IO()
 deleteTable t c = HClient.deleteTable (connectionIpOp c) (strToLazy t)
 
@@ -272,7 +293,10 @@ getColumnDescriptors t c =
 getTableRegions :: TableName -> HBaseConnection -> IO (Vector.Vector RegionInfo)
 getTableRegions t c = do
     regions <- HClient.getTableRegions ( connectionIpOp c) (strToLazy t)
-    return $ fmap (\r -> RegionInfo
+    return $ fmap tRegionInfoToRegionInfo regions
+
+tRegionInfoToRegionInfo ::TRegionInfo -> RegionInfo
+tRegionInfoToRegionInfo r = RegionInfo
                         {
                               startKey = f_TRegionInfo_startKey r
                             , endKey = f_TRegionInfo_endKey r
@@ -282,7 +306,12 @@ getTableRegions t c = do
                             , regionInfoServerName = fmap (lazyToString) $ f_TRegionInfo_serverName r
                             , regionInfoPort = f_TRegionInfo_port r
                             
-                        }) regions
+                        }                       
+getRegionInfo:: RowKey -> HBaseConnection -> IO RegionInfo
+getRegionInfo r conn = do
+    region <- HClient.getRegionInfo (connectionIpOp conn) r 
+    return $ tRegionInfoToRegionInfo region
+    
 putRow::TableName -> RowKey->[Put]->HBaseConnection -> IO()
 putRow t r p c = 
     HClient.mutateRow (connectionIpOp c) (strToLazy t) r (putsToMutations p) HashMap.empty
@@ -335,6 +364,28 @@ scannerOpenWithStop t start stop cols conn =
 scannerOpen::TableName->RowKey->[ColumnName]->HBaseConnection -> IO ScanId
 scannerOpen t start cols conn = 
     HClient.scannerOpen (connectionIpOp conn) (strToLazy t) start (Vector.fromList $ map strToLazy cols) HashMap.empty
+
+scannerOpenWithPrefix::TableName->StartAndPrefix->[ColumnName] ->HBaseConnection -> IO ScanId
+scannerOpenWithPrefix t s cols conn = 
+    HClient.scannerOpenWithPrefix (connectionIpOp conn) (strToLazy t) s (Vector.fromList $ map strToLazy cols) HashMap.empty
+scannerOpenTs ::TableName->RowKey->[ColumnName]->TimeStamp -> HBaseConnection-> IO ScanId
+
+scannerOpenTs t s cols ts conn = 
+    HClient.scannerOpenTs (connectionIpOp conn) (strToLazy t) s (Vector.fromList $ map strToLazy cols) ts HashMap.empty
+
+scannerOpenWithStopTs ::TableName -> RowKey->RowKey-> [ColumnName]->TimeStamp->HBaseConnection -> IO ScanId
+scannerOpenWithStopTs t start stop cols ts conn = 
+    HClient.scannerOpenWithStopTs (connectionIpOp conn) (strToLazy t) start stop (Vector.fromList $ map strToLazy cols) ts HashMap.empty
+ 
+scannerGet ::ScanId -> HBaseConnection -> IO (Vector.Vector RowResult)
+scannerGet s conn = do
+    results <- HClient.scannerGet (connectionIpOp conn) s
+    return $ Vector.map tRowResultToRowResult results
+
+scannerGetList::ScanId -> Int32->HBaseConnection -> IO (Vector.Vector RowResult)
+scannerGetList s nbrOfRows conn = do
+    results <- HClient.scannerGetList (connectionIpOp conn) s nbrOfRows  
+    return $ Vector.map tRowResultToRowResult results
     
 scannerClose :: ScanId->HBaseConnection->IO()
 scannerClose s conn = HClient.scannerClose (connectionIpOp conn) s

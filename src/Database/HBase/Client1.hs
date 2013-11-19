@@ -45,6 +45,8 @@ module Database.HBase.Client1
     , deleteAllRowTs
     , scannerOpenWithScan
     , scannerClose
+    , scannerOpenWithStop
+    , scannerOpen
 ) where
 
 import qualified    Data.ByteString.Lazy        as BL
@@ -326,7 +328,13 @@ scannerOpenWithScan :: TableName -> Scan -> HBaseConnection -> IO ScanId
 scannerOpenWithScan t s conn = 
     HClient.scannerOpenWithScan (connectionIpOp conn) (strToLazy t) (scanToTScan s) HashMap.empty
 
-    
+scannerOpenWithStop::TableName->RowKey->RowKey->[ColumnName]->HBaseConnection->IO ScanId
+scannerOpenWithStop t start stop cols conn = 
+    HClient.scannerOpenWithStop (connectionIpOp conn) (strToLazy t) start stop (Vector.fromList $ map strToLazy cols) HashMap.empty
+
+scannerOpen::TableName->RowKey->[ColumnName]->HBaseConnection -> IO ScanId
+scannerOpen t start cols conn = 
+    HClient.scannerOpen (connectionIpOp conn) (strToLazy t) start (Vector.fromList $ map strToLazy cols) HashMap.empty
     
 scannerClose :: ScanId->HBaseConnection->IO()
 scannerClose s conn = HClient.scannerClose (connectionIpOp conn) s

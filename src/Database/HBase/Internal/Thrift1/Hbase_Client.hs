@@ -12,7 +12,7 @@
 -- DO NOT EDIT UNLESS YOU ARE SURE YOU KNOW WHAT YOU ARE DOING --
 -----------------------------------------------------------------
 
-module Database.Hbase.Internal.Hbase_Client(enableTable,disableTable,isTableEnabled,compact,majorCompact,getTableNames,getColumnDescriptors,getTableRegions,createTable,deleteTable,get,getVer,getVerTs,getRow,getRowWithColumns,getRowTs,getRowWithColumnsTs,getRows,getRowsWithColumns,getRowsTs,getRowsWithColumnsTs,mutateRow,mutateRowTs,mutateRows,mutateRowsTs,atomicIncrement,deleteAll,deleteAllTs,deleteAllRow,increment,incrementRows,deleteAllRowTs,scannerOpenWithScan,scannerOpen,scannerOpenWithStop,scannerOpenWithPrefix,scannerOpenTs,scannerOpenWithStopTs,scannerGet,scannerGetList,scannerClose,getRowOrBefore,getRegionInfo) where
+module Database.HBase.Internal.Thrift1.Hbase_Client(enableTable,disableTable,isTableEnabled,compact,majorCompact,getTableNames,getColumnDescriptors,getTableRegions,createTable,deleteTable,get,getVer,getVerTs,getRow,getRowWithColumns,getRowTs,getRowWithColumnsTs,getRows,getRowsWithColumns,getRowsTs,getRowsWithColumnsTs,mutateRow,mutateRowTs,mutateRows,mutateRowsTs,atomicIncrement,deleteAll,deleteAllTs,deleteAllRow,increment,incrementRows,deleteAllRowTs,scannerOpenWithScan,scannerOpen,scannerOpenWithStop,scannerOpenWithPrefix,scannerOpenTs,scannerOpenWithStopTs,scannerGet,scannerGetList,scannerClose,getRowOrBefore,getRegionInfo) where
 import Data.IORef
 import Prelude ( Bool(..), Enum, Double, String, Maybe(..),
                  Eq, Show, Ord,
@@ -34,8 +34,8 @@ import Thrift
 import Thrift.Types ()
 
 
-import Database.Hbase.Internal.Hbase_Types
-import Database.Hbase.Internal.Hbase
+import Database.HBase.Internal.Thrift1.Hbase_Types
+import Database.HBase.Internal.Thrift1.Hbase
 
 seqid = newIORef 0
 enableTable (ip,op) arg_tableName = do

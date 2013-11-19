@@ -10,9 +10,10 @@ maintainer:     danplubell@gmail.com
 homepage:       https://github.com/danplubell/hbase-haskell
 category:       Database
 description:
-  The objective of this library is to provide a light wrapper over the HBase Thrift API.  The intent is to provide a more idiomatic 
+  The objective of this library is to provide a light wrapper over the HBase Thrift API.  The intent is to provide a more idiomatic
   way of using an HBase database.
   .
+  It contains the functions for both versions of the HBase Thrift server.
   
 
 
@@ -29,11 +30,5 @@ library
                    bytestring,
                    network
   ghc-options:     -Wall
-  other-modules:   
-                   Database.Hbase.Internal.Hbase,
-                   Database.Hbase.Internal.Hbase_Client,
-                   Database.Hbase.Internal.Hbase_Consts,
-                   Database.Hbase.Internal.Hbase_Iface,
-                   Database.Hbase.Internal.Hbase_Types
-  exposed-modules: Database.Hbase.Client
+  exposed-modules: Database.HBase.Client1
 

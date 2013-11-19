@@ -12,7 +12,7 @@
 -- DO NOT EDIT UNLESS YOU ARE SURE YOU KNOW WHAT YOU ARE DOING --
 -----------------------------------------------------------------
 
-module Database.Hbase.Internal.Hbase_Iface where
+module Database.HBase.Internal.Thrift1.Hbase_Iface where
 import Prelude ( Bool(..), Enum, Double, String, Maybe(..),
                  Eq, Show, Ord,
                  return, length, IO, fromIntegral, fromEnum, toEnum,
@@ -33,7 +33,7 @@ import Thrift
 import Thrift.Types ()
 
 
-import Database.Hbase.Internal.Hbase_Types
+import Database.HBase.Internal.Thrift1.Hbase_Types
 
 class Hbase_Iface a where
   enableTable :: a -> Maybe ByteString -> IO ()

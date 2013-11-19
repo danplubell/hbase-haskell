@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Database.Hbase.Client
+{-
+Client definition for Thrift API.  There is a separate client of the Thrift 2 API
+-}
+module Database.HBase.Client1
 (
       HBaseConnectionSource(..)
     , HBaseColumnDescriptor(..)
@@ -41,6 +44,7 @@ module Database.Hbase.Client
     , deleteAllRow
     , deleteAllRowTs
     , scannerOpenWithScan
+    , scannerClose
 ) where
 
 import qualified    Data.ByteString.Lazy        as BL
@@ -54,8 +58,8 @@ import              Thrift.Transport.Handle
 import              Thrift.Protocol.Binary
 import              GHC.Word(Word8)
 import              GHC.Int
-import              Database.Hbase.Internal.Hbase_Types
-import qualified    Database.Hbase.Internal.Hbase_Client as HClient
+import              Database.HBase.Internal.Thrift1.Hbase_Types
+import qualified    Database.HBase.Internal.Thrift1.Hbase_Client as HClient
 import qualified    Data.Vector                 as Vector
 import qualified    Data.HashMap.Strict as HashMap
 
@@ -257,9 +261,10 @@ majorCompact :: TableRegionName -> HBaseConnection -> IO()
 majorCompact tr c = HClient.majorCompact (connectionIpOp c) (strToLazy tr)
 
 getColumnDescriptors ::TableName-> HBaseConnection -> IO (HashMap.HashMap ColumnName HBaseColumnDescriptor)
-getColumnDescriptors t c = do
+getColumnDescriptors t c = 
+  do
     results <- HClient.getColumnDescriptors (connectionIpOp c) (strToLazy t)
-    return $    HashMap.fromList $ map  (\(n,cols) -> (lazyToString n, hColDescFromfColDesc cols)) (HashMap.toList results)
+    return $ HashMap.fromList $ map  (\(n,cols) -> (lazyToString n, hColDescFromfColDesc cols)) (HashMap.toList results)
 
 
 getTableRegions :: TableName -> HBaseConnection -> IO (Vector.Vector RegionInfo)
@@ -293,9 +298,8 @@ putRowsTs t b ts c =
     HClient.mutateRowsTs (connectionIpOp c) (strToLazy t) (batchPutsToBatchMutations b) ts HashMap.empty 
     
 atomicIncrement::TableName -> RowKey -> ColumnName -> Int64 -> HBaseConnection -> IO Int64
-atomicIncrement t r c i conn= do
-    result <- HClient.atomicIncrement (connectionIpOp conn) (strToLazy t) r (strToLazy c) i 
-    return result
+atomicIncrement t r c i conn=  HClient.atomicIncrement (connectionIpOp conn) (strToLazy t) r (strToLazy c) i 
+    
 -- increment (ip,op) arg_increment
 increment :: Increment -> HBaseConnection -> IO ()
 increment i conn= 
@@ -319,13 +323,16 @@ deleteAllRowTs::TableName -> RowKey -> TimeStamp->HBaseConnection -> IO()
 deleteAllRowTs t r ts conn = HClient.deleteAllRowTs (connectionIpOp conn) (strToLazy t) r ts HashMap.empty
 
 scannerOpenWithScan :: TableName -> Scan -> HBaseConnection -> IO ScanId
-scannerOpenWithScan t s conn = do
+scannerOpenWithScan t s conn = 
     HClient.scannerOpenWithScan (connectionIpOp conn) (strToLazy t) (scanToTScan s) HashMap.empty
+
     
     
+scannerClose :: ScanId->HBaseConnection->IO()
+scannerClose s conn = HClient.scannerClose (connectionIpOp conn) s
+
 
 -----------Utility Functions-----------------
---convert a string to list of Word8
 strToWord8s :: String -> [Word8]
 strToWord8s = BSI.unpackBytes . BC.pack 
 

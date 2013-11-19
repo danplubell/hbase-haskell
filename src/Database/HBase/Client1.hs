@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-
-Client definition for Thrift API.  There is a separate client of the Thrift 2 API
+Client definition for Thrift API.  This API is for the Thrift1 API.  There is a separate client for the Thrift2 API
 -}
 module Database.HBase.Client1
 (
@@ -498,7 +498,5 @@ scanToTScan s = TScan
         , f_TScan_caching = Just $ scanCaching s
         , f_TScan_filterString = fmap strToLazy $ scanFilterString s
         , f_TScan_batchSize = scanBatchSize s
-        , f_TScan_sortColumns = Just $ scanSortColumns s
-        
-          
+        , f_TScan_sortColumns = Just $ scanSortColumns s          
     }            

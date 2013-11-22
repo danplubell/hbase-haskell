@@ -2,7 +2,7 @@
 {-
 Client definition for Thrift API.  This API is for the Thrift1 API.  There is a separate client for the Thrift2 API
 -}
-module Database.HBase.Client1
+module Database.HBase.Client
 (
       HBaseConnectionSource(..)
     , HBaseColumnDescriptor(..)
@@ -78,8 +78,8 @@ import              Thrift.Transport.Handle
 import              Thrift.Protocol.Binary
 import              GHC.Word(Word8)
 import              GHC.Int
-import              Database.HBase.Internal.Thrift1.Hbase_Types
-import qualified    Database.HBase.Internal.Thrift1.Hbase_Client as HClient
+import              Database.HBase.Internal.Thrift.Hbase_Types
+import qualified    Database.HBase.Internal.Thrift.Hbase_Client as HClient
 import qualified    Data.Vector                 as Vector
 import qualified    Data.HashMap.Strict as HashMap
 

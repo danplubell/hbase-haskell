@@ -30,5 +30,5 @@ library
                    bytestring,
                    network
   ghc-options:     -Wall
-  exposed-modules: Database.HBase.Client1
+  exposed-modules: Database.HBase.Client
 
